@@ -1,26 +1,23 @@
 {
-  "name": "route-trie",
+  "name": "route-trie-esm",
   "description": "A minimal and powerful trie based url path router for Node.js.",
   "authors": [
-    "Yan Qing <admin@zensh.com>"
+    "Yan Qing <admin@zensh.com>",
+    "Tony Mobily <tonymobily@gmail.com>"
   ],
   "version": "3.0.0",
   "license": "MIT",
-  "main": "build/index.js",
-  "types": "build/index.d.ts",
+  "main": "index.js",
   "scripts": {
-    "build": "rm -rf build && tsc",
-    "test": "tslint -p tsconfig.json -t stylish 'src/**/*.ts' 'test/**/*.ts' && tman -r ts-node/register 'test/**/*.ts'",
-    "lint": "tslint -p tsconfig.json -t stylish 'src/**/*.ts' 'test/**/*.ts'"
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com:zensh/route-trie.git"
+    "url": "git@github.com:mobily-enterprises/route-trie-esm.git"
   },
   "engines": {
     "node": ">= 8"
   },
-  "homepage": "https://github.com/zensh/route-trie",
+  "homepage": "https://github.com/mobily-enterprises-esm/route-trie",
   "keywords": [
     "trie",
     "router",
@@ -32,12 +29,6 @@
   ],
   "dependencies": {},
   "devDependencies": {
-    "@types/node": "^10.12.5",
-    "tman": "^1.8.1",
-    "ts-node": "^7.0.1",
-    "tslint": "^5.11.0",
-    "tslint-eslint-rules": "^5.4.0",
-    "typescript": "^3.1.6"
   },
   "files": [
     "build",

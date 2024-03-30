@@ -1,8 +1,3 @@
-// **Github:** https://github.com/zensh/route-trie
-//
-// **License:** MIT
-'use strict'
-
 // the valid characters for the path component:
 // [A-Za-z0-9!$%&'()*+,-.:;=@_~]
 // http://stackoverflow.com/questions/4669692/valid-characters-for-directory-part-of-a-url-for-short-links
@@ -13,21 +8,7 @@ const doubleColonReg = /^::[A-Za-z0-9!$%&'*+,-.:;=@_~]*$/
 const trimSlashReg = /^\//
 const fixMultiSlashReg = /\/{2,}/g
 
-export interface TrieOptions {
-  ignoreCase?: boolean
-  fixedPathRedirect?: boolean
-  trailingSlashRedirect?: boolean
-}
-
-export interface Params {
-  [index: string]: string
-}
-
-export class Matched {
-  node: Node | null
-  params: Params
-  fpr: string
-  tsr: string
+class Matched {
   constructor () {
     // Either a Node pointer when matched or nil
     this.node = null
@@ -41,27 +22,8 @@ export class Matched {
   }
 }
 
-interface Children {
-  [index: string]: Node
-}
-interface Handlers {
-  [index: string]: any
-}
-
-export class Node {
-  name: string
-  allow: string
-  pattern: string
-  suffix: string
-  regex: RegExp | null
-  endpoint: boolean
-  wildcard: boolean
-  varyChildren: Node[]
-  children: Children
-  parent: Node | null
-  private handlers: Handlers
-  private segment: string
-  constructor (parent: Node | null) {
+class Node {
+  constructor (parent) {
     this.name = ''
     this.allow = ''
     this.pattern = ''
@@ -76,7 +38,7 @@ export class Node {
     this.handlers = Object.create(null)
   }
 
-  handle (method: string, handler: any) {
+  handle (method, handler) {
     if (handler == null) {
       throw new TypeError('handler should not be null')
     }
@@ -91,7 +53,7 @@ export class Node {
     }
   }
 
-  getHandler (method: string): any {
+  getHandler (method) {
     return this.handlers[method] == null ? null : this.handlers[method]
   }
 
@@ -112,17 +74,11 @@ export class Node {
   }
 }
 
-export class Trie {
+class Trie {
   static NAME = 'Trie'
   static VERSION = 'v3.0.0'
-  static Node = Node
-  static Matched = Matched
 
-  root: Node
-  private ignoreCase: boolean
-  private fpr: boolean
-  private tsr: boolean
-  constructor (options: TrieOptions = {}) {
+  constructor (options = {}) {
     // Ignore case when matching URL path.
     this.ignoreCase = options.ignoreCase !== false
 
@@ -144,7 +100,7 @@ export class Trie {
     this.root = new Node(null)
   }
 
-  define (pattern: string): Node {
+  define (pattern) {
     if (typeof pattern !== 'string') {
       throw new TypeError('Pattern must be string.')
     }
@@ -160,7 +116,7 @@ export class Trie {
     return node
   }
 
-  match (path: string): Matched {
+  match (path) {
     // the path should be normalized before match, just as path.normalize do in Node.js
     if (typeof path !== 'string') {
       throw new TypeError('Path must be string.')
@@ -233,8 +189,8 @@ export class Trie {
   }
 }
 
-function defineNode (parent: Node, segments: string[], ignoreCase: boolean): Node {
-  const segment = segments.shift() as string
+function defineNode (parent, segments, ignoreCase) {
+  const segment = segments.shift()
   const child = parseNode(parent, segment, ignoreCase)
 
   if (segments.length === 0) {
@@ -247,7 +203,7 @@ function defineNode (parent: Node, segments: string[], ignoreCase: boolean): Nod
   return defineNode(child, segments, ignoreCase)
 }
 
-function matchNode (parent: Node, segment: string): Node | null {
+function matchNode (parent, segment) {
   if (parent.children[segment] != null) {
     return parent.children[segment]
   }
@@ -267,7 +223,7 @@ function matchNode (parent: Node, segment: string): Node | null {
   return null
 }
 
-function parseNode (parent: Node, segment: string, ignoreCase: boolean): Node {
+function parseNode (parent, segment, ignoreCase) {
   let _segment = segment
   if (doubleColonReg.test(segment)) {
     _segment = segment.slice(1)
@@ -375,4 +331,4 @@ function parseNode (parent: Node, segment: string, ignoreCase: boolean): Node {
   return node
 }
 
-export default Trie
+export { Trie as default, Node, Matched }

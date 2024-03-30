@@ -2,7 +2,7 @@
 
 import assert from 'assert'
 import { suite, it } from 'tman'
-import { Trie } from '../src'
+import { Trie } from '.'
 
 suite('trie.define', function () {
   it('root pattern', function () {

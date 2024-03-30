@@ -1,17 +1,10 @@
-# route-trie
+# route-trie-esm
 
-A minimal and powerful trie based url path router for Node.js.
+A minimal and powerful trie based url path router as an Ecma Script Module (works in Node.js and browser).
 
-[![NPM version][npm-image]][npm-url]
-[![Build Status][travis-image]][travis-url]
-[![Coverage Status][coveralls-image]][coveralls-url]
-[![Downloads][downloads-image]][downloads-url]
+This is a fork of [route-trie](https://github.com/zensh/route-trie), ported from TypeScript and made available as a ESM.
 
-## Golang Version
-
-https://github.com/teambition/trie-mux
-
-### [Trie-based request routing](http://blog.vulcanproxy.com/trie-based-http-requests-routing/)
+# [Trie-based request routing](http://blog.vulcanproxy.com/trie-based-http-requests-routing/)
 
 route-trie is a [trie](http://en.wikipedia.org/wiki/Trie)-based URL router.
 Its goal is only to define and match URLs.
@@ -19,9 +12,6 @@ It does not handle methods, headers, controllers, views, etc., in anyway.
 It is faster than traditional, linear, regular expression-matching routers, although insignficantly,
 and scales with the number of routes.
 
-Implementations:
-
-- [toa-router](https://github.com/toajs/toa-router) A trie router for toa(server).
 
 ## Features
 
@@ -36,7 +26,7 @@ Implementations:
 ## Installation
 
 ```sh
-npm install route-trie
+npm install route-trie-esm
 ```
 
 ## API
@@ -226,14 +216,3 @@ class Matched {
 }
 ```
 
-[npm-url]: https://npmjs.org/package/route-trie
-[npm-image]: http://img.shields.io/npm/v/route-trie.svg
-
-[travis-url]: https://travis-ci.org/zensh/route-trie
-[travis-image]: http://img.shields.io/travis/zensh/route-trie.svg
-
-[coveralls-url]: https://coveralls.io/r/zensh/route-trie
-[coveralls-image]: https://coveralls.io/repos/zensh/route-trie/badge.svg
-
-[downloads-url]: https://npmjs.org/package/route-trie
-[downloads-image]: http://img.shields.io/npm/dm/route-trie.svg?style=flat-square
