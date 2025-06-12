@@ -290,7 +290,7 @@ class Trie {
         default:
           const n = name.search(suffixReg)
           if (n >= 0) {
-            node.suffix = name.slice(n + 1); // Corrected slice
+            node.suffix = name.slice(n + 1);
             name = name.slice(0, n)
             node.priority = 4
           }
@@ -312,7 +312,9 @@ class Trie {
       if (node.priority === 0) {
         node.priority = 2
       }
-      if (!wordReg.test(name)) {
+
+      // Bug Fix: Stricter validation for parameter names
+      if (!wordReg.test(name) || /^[0-9]/.test(name)) {
         throw new Error(`Invalid pattern: "${parent.getSegments()}${segment}"`)
       }
       node.name = name
