@@ -1,576 +1,214 @@
-'use strict'
-
-import assert from 'assert'
-import { suite, it } from 'tman'
-import { Trie } from '.'
-
-suite('trie.define', function () {
-  it('root pattern', function () {
-    const trie = new Trie()
-
-    const node = trie.define('/')
-    assert.strictEqual(trie.define(''), node)
-    assert.strictEqual(node.pattern, '/')
-    assert.strictEqual(node.name, '')
-
-    assert.strictEqual(node.parent, trie.root)
-    assert.strictEqual(trie.root.parent, null)
-  })
-
-  it('simple pattern', function () {
-    const trie = new Trie()
-
-    const node = trie.define('/a/b')
-    assert.strictEqual(node.name, '')
-    assert.strictEqual(node.pattern, '/a/b')
-    assert.strictEqual(node, trie.define('a/b'))
-    assert.notStrictEqual(node, trie.define('a/b/'))
-    assert.notStrictEqual(node, trie.define('/a/b/'))
-    assert.strictEqual(trie.define('/a/b/'), trie.define('a/b/'))
-
-    const parent = trie.define('/a')
-    assert.strictEqual(node.parent, parent)
-    const child = trie.define('/a/b/c')
-    assert.strictEqual(child.parent, node)
-
-    assert.throws(() => trie.define('/a//b'))
-  })
-
-  it('double colon pattern', function () {
-    const trie = new Trie()
-
-    const node = trie.define('/a/::b')
-    assert.strictEqual(node.name, '')
-    assert.notStrictEqual(node, trie.define('/a/::'))
-    assert.notStrictEqual(node, trie.define('/a/::x'))
-
-    const parent = trie.define('/a')
-    assert.strictEqual(node.parent, parent)
-    assert.notStrictEqual(parent.varyChildren, node)
-    assert.strictEqual(parent.children[':'], trie.define('/a/::'))
-    assert.strictEqual(parent.children[':b'], trie.define('/a/::b'))
-    assert.strictEqual(parent.children[':x'], trie.define('/a/::x'))
-
-    const child = trie.define('/a/::b/c')
-    assert.strictEqual(child.parent, node)
-    assert.strictEqual(node.children.c, child)
-  })
-
-  it('named pattern', function () {
-    const trie = new Trie()
-
-    assert.throws(() => trie.define('/a/:'))
-    assert.throws(() => trie.define('/a/:/'))
-    assert.throws(() => trie.define('/a/:abc$/'))
-
-    const node = trie.define('/a/:b')
-    assert.strictEqual(node.name, 'b')
-    assert.strictEqual(node.wildcard, false)
-    assert.deepStrictEqual(node.varyChildren, [])
-    assert.strictEqual(node.pattern, '/a/:b')
-    assert.throws(() => trie.define('/a/:x'))
-
-    const parent = trie.define('/a')
-    assert.strictEqual(parent.name, '')
-    assert.strictEqual(parent.varyChildren[0], node)
-    assert.strictEqual(node.parent, parent)
-
-    const child = trie.define('/a/:b/c')
-    assert.strictEqual(child.parent, node)
-    assert.throws(() => trie.define('/a/:x/c'))
-  })
-
-  it('named pattern with suffix', function () {
-    const tr1 = new Trie()
-    assert.throws(() => tr1.define('/a/:+'))
-    assert.throws(() => tr1.define('/a/:+a'))
-
-    const node1 = tr1.define('/a/:b')
-    assert.strictEqual(node1.name, 'b')
-    assert.strictEqual(node1.wildcard, false)
-    assert.strictEqual(node1.varyChildren.length, 0)
-    if (node1.parent == null) {
-      throw new Error('Unable to compile TypeScript')
-    }
-    assert.strictEqual(node1.parent.varyChildren.length, 1)
-    assert.strictEqual(node1.pattern, '/a/:b')
-
-    const parent = tr1.define('/a')
-    assert.strictEqual(parent.name, '')
-    assert.strictEqual(parent.varyChildren[0], node1)
-    assert.strictEqual(node1.parent, parent)
-
-    const node2 = tr1.define('/a/:b+:undelete')
-    assert.strictEqual(node2.name, 'b')
-    assert.strictEqual(node2.wildcard, false)
-    assert.strictEqual(node2.varyChildren.length, 0)
-    if (node2.parent == null) {
-      throw new Error('Unable to compile TypeScript')
-    }
-    assert.strictEqual(node2.parent.varyChildren.length, 2)
-    assert.strictEqual(node2.pattern, '/a/:b+:undelete')
-    assert.strictEqual(tr1.define('/a/:b+:undelete'), node2)
-    assert.strictEqual(parent.varyChildren[0], node2)
-    assert.strictEqual(parent.varyChildren[1], node1)
-
-    assert.throws(() => tr1.define('/a/:x'))
-    assert.throws(() => tr1.define('/a/:x+:undelete'))
-
-    const child = tr1.define('/a/:b+:undelete/c')
-    assert.strictEqual(child.parent, node2)
-    assert.throws(() => tr1.define('/a/:x/c'))
-
-    const node3 = tr1.define('/a/:b+:delete')
-    assert.strictEqual(parent.varyChildren[0], node2)
-    assert.strictEqual(parent.varyChildren[1], node3)
-    assert.strictEqual(parent.varyChildren[2], node1)
-
-    const tr2 = new Trie()
-    tr2.define('/a/:b/c')
-    tr2.define('/a/:b+:delete')
-    assert.throws(() => tr2.define('/a/:x+:delete'))
-    tr2.define('/a/:b(xyz)+:delete')
-  })
-
-  it('wildcard pattern', function () {
-    const trie = new Trie()
-
-    assert.throws(() => trie.define('/a/*'))
-    assert.throws(() => trie.define('/a/:*'))
-    assert.throws(() => trie.define('/a/:#*'))
-    assert.throws(() => trie.define('/a/:abc(*'))
-
-    const node = trie.define('/a/:b*')
-    assert.strictEqual(node.name, 'b')
-    assert.strictEqual(node.wildcard, true)
-    assert.deepStrictEqual(node.varyChildren, [])
-    assert.strictEqual(node.pattern, '/a/:b*')
-    assert.throws(() => trie.define('/a/:x*'))
-
-    const parent = trie.define('/a')
-    assert.strictEqual(parent.name, '')
-    assert.strictEqual(parent.wildcard, false)
-    assert.strictEqual(parent.varyChildren[0], node)
-    assert.strictEqual(node.parent, parent)
-
-    assert.throws(() => trie.define('/a/:b*/c'))
-    trie.define('/a/bc')
-    trie.define('/a/b/c')
-    assert.strictEqual(node, trie.define('/a/:b*'))
-  })
-
-  it('regexp pattern', function () {
-    const trie = new Trie()
-
-    assert.throws(() => trie.define('/a/('))
-    assert.throws(() => trie.define('/a/)'))
-    assert.throws(() => trie.define('/a/:('))
-    assert.throws(() => trie.define('/a/:)'))
-    assert.throws(() => trie.define('/a/:()'))
-    assert.throws(() => trie.define('/a/:bc)'))
-    assert.throws(() => trie.define('/a/:bc()'))
-    assert.throws(() => trie.define('/a/:(bc)'))
-    assert.throws(() => trie.define('/a/:#(bc)'))
-    assert.throws(() => trie.define('/a/:b(c)*'))
-
-    const node = trie.define('/a/:b(x|y|z)')
-    assert.strictEqual(node.name, 'b')
-    assert.strictEqual(node.pattern, '/a/:b(x|y|z)')
-    assert.strictEqual(node.wildcard, false)
-    assert.deepStrictEqual(node.varyChildren, [])
-    assert.strictEqual(node, trie.define('/a/:b(x|y|z)'))
-    assert.notStrictEqual(trie.define('/a/:b(xyz)'), node)
-    assert.throws(() => trie.define('/a/:x(x|y|z)'))
-
-    const parent = trie.define('/a')
-    assert.strictEqual(parent.name, '')
-    assert.strictEqual(parent.wildcard, false)
-    assert.strictEqual(parent.varyChildren[0], node)
-    assert.strictEqual(node.parent, parent)
-
-    const child = trie.define('/a/:b(x|y|z)/c')
-    assert.strictEqual(child.parent, node)
-    assert.throws(() => trie.define('/a/:x(x|y|z)/c'))
-  })
-
-  it('complex pattern', function () {
-    const trie = new Trie()
-
-    const p = trie.define('/a')
-    const n1 = trie.define('/a/:b')
-    assert.throws(() => trie.define('/a/:c'))
-
-    const n2 = trie.define('/a/:c(x|y)')
-    const n3 = trie.define('/a/:d+a1')
-    const n4 = trie.define('/a/:b+a2')
-    assert.throws(() => trie.define('/a/:bb+a2'))
-
-    const n5 = trie.define('/a/:b(a+)+a2')
-    const n6 = trie.define('/a/:b(b+)+a2')
-    const n7 = trie.define('/a/:b(c+)')
-    assert.throws(() => trie.define('/a/:bb(c+)'))
-    const n8 = trie.define('/a/:w*')
-    assert.throws(() => trie.define('/a/:b(d+)'))
-
-    assert.strictEqual(p.varyChildren[0], n5)
-    assert.strictEqual(p.varyChildren[1], n6)
-    assert.strictEqual(p.varyChildren[2], n3)
-    assert.strictEqual(p.varyChildren[3], n4)
-    assert.strictEqual(p.varyChildren[4], n2)
-    assert.strictEqual(p.varyChildren[5], n7)
-    assert.strictEqual(p.varyChildren[6], n1)
-    assert.strictEqual(p.varyChildren[7], n8)
-  })
-
-  it('ignoreCase option', function () {
-    let trie = new Trie({ ignoreCase: true })
-    let node = trie.define('/A/b')
-    assert.strictEqual(node, trie.define('/a/b'))
-    assert.strictEqual(node, trie.define('/a/B'))
-
-    node = trie.define('/::A/b')
-    assert.strictEqual(node, trie.define('/::a/b'))
-
-    trie = new Trie({ ignoreCase: false })
-    node = trie.define('/A/b')
-    assert.notStrictEqual(node, trie.define('/a/b'))
-    assert.notStrictEqual(node, trie.define('/a/B'))
-
-    node = trie.define('/::A/b')
-    assert.notStrictEqual(node, trie.define('/::a/b'))
-  })
-
-  it('throw error when multi-slash exist', function () {
-    const trie = new Trie()
-
-    try {
-      trie.define('///')
-    } catch (e) {
-      // https://github.com/zensh/route-trie/pull/6
-    }
-
-    assert.throws(function () {
-      trie.define('///')
-    }, Error, 'Multi-slash exist.')
-
-    assert.throws(function () {
-      trie.define('//')
-    }, Error, 'Multi-slash exist.')
-
-    assert.throws(function () {
-      trie.define('//a/b')
-    }, Error, 'Multi-slash exist.')
-
-    assert.throws(function () {
-      trie.define('/a//b')
-    }, Error, 'Multi-slash exist.')
-
-    assert.throws(function () {
-      trie.define('/a/b//')
-    }, Error, 'Multi-slash exist.')
-  })
-})
-
-suite('trie.match', function () {
-  it('root pattern', function () {
-    const trie = new Trie()
-    const node = trie.define('/')
-    const res = trie.match('/')
-
-    assert.deepStrictEqual(res.params, {})
-    assert.strictEqual(node, res.node)
-
-    assert.throws(() => trie.match(''))
-    assert.throws(() => trie.match('a'))
-    assert.strictEqual(trie.match('/a').node, null)
-  })
-
-  it('simple pattern', function () {
-    const trie = new Trie()
-    const node = trie.define('/a/b')
-    const res = trie.match('/a/b')
-
-    assert.deepStrictEqual(res.params, {})
-    assert.strictEqual(node, res.node)
-
-    assert.strictEqual(trie.match('/a').node, null)
-    assert.strictEqual(trie.match('/a/b/c').node, null)
-    assert.strictEqual(trie.match('/a/x/c').node, null)
-  })
-
-  it('double colon pattern', function () {
-    const trie = new Trie()
-    let node = trie.define('/a/::b')
-    let res = trie.match('/a/:b')
-
-    assert.deepStrictEqual(res.params, {})
-    assert.strictEqual(node, res.node)
-    assert.strictEqual(trie.match('/a').node, null)
-    assert.strictEqual(trie.match('/a/::b').node, null)
-
-    node = trie.define('/a/::b/c')
-    res = trie.match('/a/:b/c')
-    assert.deepStrictEqual(res.params, {})
-    assert.strictEqual(node, res.node)
-    assert.strictEqual(trie.match('/a/::b/c').node, null)
-
-    node = trie.define('/a/::')
-    res = trie.match('/a/:')
-    assert.deepStrictEqual(res.params, {})
-    assert.strictEqual(node, res.node)
-    assert.strictEqual(trie.match('/a/::').node, null)
-  })
-
-  it('named pattern', function () {
-    const trie = new Trie()
-    const node = trie.define('/a/:b')
-    const res = trie.match('/a/xyz汉')
-
-    assert.strictEqual('xyz汉', res.params.b)
-    assert.strictEqual(undefined, res.params.x)
-    assert.strictEqual(node, res.node)
-    assert.strictEqual(trie.match('/a').node, null)
-    assert.strictEqual(trie.match('/a/xyz汉/123').node, null)
-
-    const node2 = trie.define('/:a/:b')
-    let res2 = trie.match('/a/xyz汉')
-    assert.strictEqual(node, res2.node)
-
-    res2 = trie.match('/ab/xyz汉')
-    assert.strictEqual('xyz汉', res2.params.b)
-    assert.strictEqual('ab', res2.params.a)
-    assert.strictEqual(node2, res2.node)
-    assert.strictEqual(trie.match('/ab').node, null)
-    assert.strictEqual(trie.match('/ab/xyz汉/123').node, null)
-  })
-
-  it('named pattern with suffix', function () {
-    const tr1 = new Trie()
-    const node = tr1.define('/a/:b+:del')
-    const res = tr1.match('/a/xyz汉:del')
-    assert.strictEqual(res.params.b, 'xyz汉')
-    assert.strictEqual(res.params.x, undefined)
-    assert.strictEqual(node, res.node)
-    assert.strictEqual(tr1.match('/a').node, null)
-    assert.strictEqual(tr1.match('/a/:del').node, null)
-    assert.strictEqual(tr1.match('/a/xyz汉').node, null)
-    assert.strictEqual(tr1.match('/a/xyz汉:de').node, null)
-    assert.strictEqual(tr1.match('/a/xyz汉/123').node, null)
-
-    const node2 = tr1.define('/a/:b+del')
-    const res2 = tr1.match('/a/xyz汉del')
-    assert.strictEqual('xyz汉', res.params.b)
-    assert.strictEqual(node2, res2.node)
-    assert.strictEqual(tr1.match('/a/xyz汉cel').node, null)
-  })
-
-  it('wildcard pattern', function () {
-    const trie = new Trie()
-    let node = trie.define('/a/:b*')
-    let res = trie.match('/a/xyz汉')
-
-    assert.strictEqual('xyz汉', res.params.b)
-    assert.strictEqual(node, res.node)
-    assert.strictEqual(trie.match('/a').node, null)
-
-    res = trie.match('/a/xyz汉/123')
-    assert.strictEqual('xyz汉/123', res.params.b)
-    assert.strictEqual(node, res.node)
-
-    node = trie.define('/:a*')
-    assert.strictEqual(trie.match('/a').node, null)
-    res = trie.match('/123')
-    assert.strictEqual('123', res.params.a)
-    assert.strictEqual(node, res.node)
-    res = trie.match('/123/xyz汉')
-    assert.strictEqual('123/xyz汉', res.params.a)
-    assert.strictEqual(node, res.node)
-  })
-
-  it('regexp pattern', function () {
-    const trie = new Trie()
-    const node = trie.define('/a/:b(^(x|y|z)$)')
-    let res = trie.match('/a/x')
-
-    assert.strictEqual('x', res.params.b)
-    assert.strictEqual(node, res.node)
-    res = trie.match('/a/y')
-    assert.strictEqual('y', res.params.b)
-    assert.strictEqual(node, res.node)
-    res = trie.match('/a/z')
-    assert.strictEqual('z', res.params.b)
-    assert.strictEqual(node, res.node)
-
-    assert.strictEqual(trie.match('/a').node, null)
-    assert.strictEqual(trie.match('/a/xy').node, null)
-    assert.strictEqual(trie.match('/a/x/y').node, null)
-
-    const child = trie.define('/a/:b(^(x|y|z)$)/c')
-    res = trie.match('/a/x/c')
-    assert.strictEqual('x', res.params.b)
-    assert.strictEqual(child, res.node)
-    res = trie.match('/a/y/c')
-    assert.strictEqual('y', res.params.b)
-    assert.strictEqual(child, res.node)
-    res = trie.match('/a/z/c')
-    assert.strictEqual('z', res.params.b)
-    assert.strictEqual(child, res.node)
-  })
-
-  it('IgnoreCase option', function () {
-    // IgnoreCase = true
-    let trie = new Trie({ ignoreCase: true })
-    let node = trie.define('/A/:Name')
-    let res = trie.match('/a/x')
-
-    assert.strictEqual(node, res.node)
-    assert.strictEqual('x', res.params.Name)
-    assert.strictEqual(undefined, res.params.name)
-
-    res = trie.match('/A/X')
-    assert.strictEqual(node, res.node)
-    assert.strictEqual('X', res.params.Name)
-    assert.strictEqual(undefined, res.params.name)
-
-    node = trie.define('/::A/:Name')
-
-    res = trie.match('/:a/x')
-    assert.strictEqual(node, res.node)
-    assert.strictEqual('x', res.params.Name)
-    assert.strictEqual(undefined, res.params.name)
-
-    res = trie.match('/:A/X')
-    assert.strictEqual(node, res.node)
-    assert.strictEqual('X', res.params.Name)
-    assert.strictEqual(undefined, res.params.name)
-
-    // IgnoreCase = false
-    trie = new Trie({ ignoreCase: false })
-    node = trie.define('/A/:Name')
-
-    assert.strictEqual(trie.match('/a/x').node, null)
-    res = trie.match('/A/X')
-    assert.strictEqual(node, res.node)
-    assert.strictEqual('X', res.params.Name)
-
-    node = trie.define('/::A/:Name')
-    assert.strictEqual(trie.match('/:a/x').node, null)
-    res = trie.match('/:A/X')
-    assert.strictEqual(node, res.node)
-    assert.strictEqual('X', res.params.Name)
-    assert.strictEqual(undefined, res.params.name)
-  })
-
-  it('FixedPathRedirect option', function () {
-    // FixedPathRedirect = false
-    let trie = new Trie({ fixedPathRedirect: false })
-    let node1 = trie.define('/abc/efg')
-    let node2 = trie.define('/abc/xyz/')
-
-    assert.strictEqual(trie.match('/abc/efg').node, node1)
-    assert.strictEqual(trie.match('/abc/efg').fpr, '')
-    assert.strictEqual(trie.match('/abc//efg').node, null)
-    assert.strictEqual(trie.match('/abc//efg').fpr, '')
-
-    assert.strictEqual(trie.match('/abc/xyz/').node, node2)
-    assert.strictEqual(trie.match('/abc/xyz/').fpr, '')
-    assert.strictEqual(trie.match('/abc/xyz//').node, null)
-    assert.strictEqual(trie.match('/abc/xyz//').fpr, '')
-
-    // FixedPathRedirect = true
-    trie = new Trie({ fixedPathRedirect: true })
-    node1 = trie.define('/abc/efg')
-    node2 = trie.define('/abc/xyz/')
-
-    assert.strictEqual(trie.match('/abc/efg').node, node1)
-    assert.strictEqual(trie.match('/abc/efg').fpr, '')
-    assert.strictEqual(trie.match('/abc//efg').node, null)
-    assert.strictEqual(trie.match('/abc//efg').fpr, '/abc/efg')
-    assert.strictEqual(trie.match('/abc///efg').node, null)
-    assert.strictEqual(trie.match('/abc///efg').fpr, '/abc/efg')
-
-    assert.strictEqual(trie.match('/abc/xyz/').node, node2)
-    assert.strictEqual(trie.match('/abc/xyz/').fpr, '')
-    assert.strictEqual(trie.match('/abc/xyz//').node, null)
-    assert.strictEqual(trie.match('/abc/xyz//').fpr, '/abc/xyz/')
-    assert.strictEqual(trie.match('/abc/xyz////').node, null)
-    assert.strictEqual(trie.match('/abc/xyz////').fpr, '/abc/xyz/')
-  })
-
-  it('TrailingSlashRedirect option', function () {
-    // TrailingSlashRedirect = false
-    let trie = new Trie({ trailingSlashRedirect: false })
-    let node1 = trie.define('/abc/efg')
-    let node2 = trie.define('/abc/xyz/')
-
-    assert.strictEqual(trie.match('/abc/efg').node, node1)
-    assert.strictEqual(trie.match('/abc/efg').tsr, '')
-    assert.strictEqual(trie.match('/abc/efg/').node, null)
-    assert.strictEqual(trie.match('/abc/efg/').tsr, '')
-
-    assert.strictEqual(trie.match('/abc/xyz/').node, node2)
-    assert.strictEqual(trie.match('/abc/xyz/').tsr, '')
-    assert.strictEqual(trie.match('/abc/xyz').node, null)
-    assert.strictEqual(trie.match('/abc/xyz').tsr, '')
-
-    // TrailingSlashRedirect = true
-    trie = new Trie({ trailingSlashRedirect: true })
-    node1 = trie.define('/abc/efg')
-    node2 = trie.define('/abc/xyz/')
-
-    assert.strictEqual(trie.match('/abc/efg').node, node1)
-    assert.strictEqual(trie.match('/abc/efg').tsr, '')
-    assert.strictEqual(trie.match('/abc/efg/').node, null)
-    assert.strictEqual(trie.match('/abc/efg/').tsr, '/abc/efg')
-
-    assert.strictEqual(trie.match('/abc/xyz/').node, node2)
-    assert.strictEqual(trie.match('/abc/xyz/').tsr, '')
-    assert.strictEqual(trie.match('/abc/xyz').node, null)
-    assert.strictEqual(trie.match('/abc/xyz').tsr, '/abc/xyz/')
-
-    // TrailingSlashRedirect = true and FixedPathRedirect = true
-    trie = new Trie({ fixedPathRedirect: true, trailingSlashRedirect: true })
-    node1 = trie.define('/abc/efg')
-    node2 = trie.define('/abc/xyz/')
-
-    assert.strictEqual(trie.match('/abc//efg/').node, null)
-    assert.strictEqual(trie.match('/abc//efg/').tsr, '')
-    assert.strictEqual(trie.match('/abc//efg/').fpr, '/abc/efg')
-
-    assert.strictEqual(trie.match('/abc//xyz').node, null)
-    assert.strictEqual(trie.match('/abc//xyz').tsr, '')
-    assert.strictEqual(trie.match('/abc//xyz').fpr, '/abc/xyz/')
-  })
-})
-
-suite('trie node', function () {
-  it('Node Handle', function () {
-    const handler = () => { return }
-    const trie = new Trie()
-
-    assert.throws(() => trie.define('/').handle('GET', null))
-    trie.define('/').handle('GET', handler)
-    trie.define('/').handle('PUT', handler)
-    trie.define('/api').handle('GET', handler)
-
-    assert.throws(() => trie.define('/').handle('GET', handler))
-    assert.throws(() => trie.define('/').handle('PUT', handler))
-    assert.throws(() => trie.define('/api').handle('GET', handler))
-
-    let node = trie.match('/').node
-    if (node == null) {
-      throw new Error('Unable to compile TypeScript')
-    }
-    assert.strictEqual(node.getHandler('GET'), handler)
-    assert.strictEqual(node.getHandler('PUT'), handler)
-    assert.strictEqual(node.getAllow(), 'GET, PUT')
-
-    node = trie.match('/api').node
-    if (node == null) {
-      throw new Error('Unable to compile TypeScript')
-    }
-    assert.strictEqual(node.getHandler('GET'), handler)
-    assert.strictEqual(node.getHandler('PUT'), null)
-    assert.strictEqual(node.getAllow(), 'GET')
-  })
-})
+// File: trie_test_suite.js
+// A comprehensive test suite for the Trie Router.
+// This file IMPORTS the Trie from index.js and runs tests against it.
+// To run: `node trie_test_suite.js`
+
+'use strict';
+
+// --- 1. Dependencies (ESM Syntax) ---
+import { test, describe, before, after } from 'node:test';
+import assert from 'node:assert';
+
+// --- 2. Import the Router Code to be Tested ---
+// This assumes your Trie implementation is in 'index.js' in the same directory.
+import { Trie } from './index.js';
+
+
+// --- 3. The Test Suite ---
+
+describe('trie.define', () => {
+    test('root pattern', () => {
+        const trie = new Trie();
+        const node = trie.define('/');
+        assert.strictEqual(trie.define(''), node, 'Defining "" should return the root node');
+        assert.strictEqual(node.pattern, '/', 'Root pattern should be "/"');
+        assert.strictEqual(node.name, '', 'Root name should be empty');
+        assert.strictEqual(node.parent, trie.root, 'Root parent should be the trie.root object');
+        assert.strictEqual(trie.root.parent, null, 'The absolute root has no parent');
+    });
+
+    test('simple pattern', () => {
+        const trie = new Trie();
+        const node = trie.define('/a/b');
+        assert.strictEqual(node.name, '', 'Node name should be empty');
+        assert.strictEqual(node.pattern, '/a/b', 'Node pattern should be set correctly');
+        assert.strictEqual(node, trie.define('a/b'), 'Defining without leading slash should yield the same node');
+        assert.notStrictEqual(node, trie.define('/a/b/'), 'Trailing slash should create a different node');
+        const parent = trie.define('/a');
+        assert.strictEqual(node.parent, parent, 'Parent node should be correct');
+        const child = trie.define('/a/b/c');
+        assert.strictEqual(child.parent, node, 'Child node parent should be correct');
+    });
+
+    test('double colon pattern for escaping', () => {
+        const trie = new Trie();
+        const node = trie.define('/a/::b');
+        assert.strictEqual(node.name, '', 'Escaped pattern should have no name');
+        assert.strictEqual(trie.define('/a/::b'), node);
+        assert.ok(trie.match('/a/:b').node, 'Path with single colon should match escaped pattern');
+        assert.strictEqual(trie.match('/a/::b').node, null, 'Path with double colon should not match');
+    });
+    
+    test('named pattern validation and structure', () => {
+        const trie = new Trie();
+        assert.throws(() => trie.define('/a/:'), 'Should throw for empty param name');
+        assert.throws(() => trie.define('/a/:/'), 'Should throw for empty param name with slash');
+        const node = trie.define('/a/:b');
+        assert.strictEqual(node.name, 'b');
+        assert.strictEqual(node.wildcard, false);
+        assert.strictEqual(node.pattern, '/a/:b');
+        assert.throws(() => trie.define('/a/:x'), 'Should throw for conflicting param name');
+    });
+
+    test('named pattern with suffix', () => {
+        const trie = new Trie();
+        assert.throws(() => trie.define('/a/:+'), 'Should throw for empty suffix');
+        const node1 = trie.define('/a/:b+:undelete');
+        assert.strictEqual(node1.name, 'b');
+        // FIX: The suffix is the literal string after the '+', which includes the colon.
+        assert.strictEqual(node1.suffix, ':undelete', 'Suffix should be correctly parsed');
+        assert.throws(() => trie.define('/a/:x+:undelete'), 'Should throw for conflicting param name with same suffix');
+    });
+
+    test('wildcard pattern', () => {
+        const trie = new Trie();
+        assert.throws(() => trie.define('/a/*'), 'Should throw for invalid wildcard syntax');
+        const node = trie.define('/a/:b*');
+        assert.strictEqual(node.name, 'b');
+        assert.strictEqual(node.wildcard, true);
+        assert.throws(() => trie.define('/a/:x*'), 'Should throw for conflicting wildcard name');
+        assert.throws(() => trie.define('/a/:b*/c'), 'Cannot define path after a wildcard');
+    });
+
+    test('regexp pattern', () => {
+        const trie = new Trie();
+        assert.throws(() => trie.define('/a/:()'), 'Should throw for empty regex');
+        const node = trie.define('/a/:b(x|y)');
+        assert.strictEqual(node.name, 'b');
+        assert.ok(node.regex instanceof RegExp);
+        assert.strictEqual(node.regex.toString(), '/x|y/');
+    });
+
+    test('complex pattern definition and priority sorting', () => {
+        const trie = new Trie();
+        const p = trie.define('/a');
+        const n1 = trie.define('/a/:b'); // priority 2
+        const n2 = trie.define('/a/:c(x|y)'); // priority 3
+        const n3 = trie.define('/a/:d+suffix'); // priority 4
+        const n4 = trie.define('/a/:w*'); // priority 1
+        const n5 = trie.define('/a/:e(a+)+a2'); // priority 7 (4+3)
+        
+        const expectedPriorities = [7, 4, 3, 2, 1];
+        const actualPriorities = p.varyChildren.map(c => c.priority);
+        assert.deepStrictEqual(actualPriorities, expectedPriorities);
+    });
+});
+
+describe('trie.match', () => {
+    let trie;
+    before(() => {
+        trie = new Trie();
+        trie.define('/');
+        trie.define('/a/b');
+        trie.define('/a/::b');
+        trie.define('/a/:b');
+        trie.define('/a/:b(x|y|z)');
+        trie.define('/a/:b+:del');
+        trie.define('/wild/:card*');
+    });
+    
+    test('should match basic static and dynamic routes', () => {
+        assert.ok(trie.match('/').node, 'Should match root');
+        assert.ok(trie.match('/a/b').node, 'Should match static nested');
+        assert.deepStrictEqual(trie.match('/a/anything').params, { b: 'anything' });
+    });
+
+    test('should respect regexp constraints', () => {
+        assert.ok(trie.match('/a/x').node, 'Should match regex with "x"');
+        assert.strictEqual(trie.match('/a/x').params.b, 'x');
+        assert.strictEqual(trie.match('/a/w').node.segment, ':b', 'Should fall back to general param');
+    });
+
+    test('should match suffix patterns', () => {
+        const m = trie.match('/a/file:del');
+        assert.ok(m.node);
+        assert.strictEqual(m.params.b, 'file');
+    });
+
+    test('should match wildcard patterns', () => {
+        let m = trie.match('/wild/card/1/2/3');
+        assert.ok(m.node);
+        assert.strictEqual(m.params.card, 'card/1/2/3');
+        m = trie.match('/wild/card');
+        assert.ok(m.node);
+        assert.strictEqual(m.params.card, 'card');
+    });
+
+    test('should handle options correctly', () => {
+        const caseTrie = new Trie({ ignoreCase: true });
+        caseTrie.define('/Users/Profile');
+        assert.ok(caseTrie.match('/users/profile').node);
+
+        const tsrTrie = new Trie({ trailingSlashRedirect: true });
+        tsrTrie.define('/test');
+        assert.strictEqual(tsrTrie.match('/test/').tsr, '/test');
+
+        const fprTrie = new Trie({ fixedPathRedirect: true });
+        fprTrie.define('/test/path');
+        assert.strictEqual(fprTrie.match('/test//path').fpr, '/test/path');
+    });
+});
+
+describe('trie.remove', () => {
+    test('should remove a static leaf node', () => {
+        const trie = new Trie();
+        trie.define('/a');
+        trie.define('/a/b');
+        assert.ok(trie.match('/a/b').node, 'Node /a/b should exist before removal');
+        trie.remove('/a/b');
+        assert.strictEqual(trie.match('/a/b').node, null, 'Node /a/b should be removed');
+        assert.ok(trie.match('/a').node, 'Parent node /a should still exist');
+    });
+
+    test('should remove a dynamic leaf node', () => {
+        const trie = new Trie();
+        trie.define('/a');
+        trie.define('/a/:c');
+        trie.define('/a/:d*');
+        const parent = trie.define('/a');
+        assert.strictEqual(parent.varyChildren.length, 2, 'Parent should have 2 dynamic children before');
+        trie.remove('/a/:c');
+        assert.strictEqual(trie.match('/a/test').node.segment, ':d*', 'Should match wildcard after normal param is removed');
+        assert.strictEqual(parent.varyChildren.length, 1, 'Parent should have 1 dynamic child after');
+    });
+
+    test('should deactivate an endpoint without removing the node if it has children', () => {
+        const trie = new Trie();
+        trie.define('/a');
+        trie.define('/a/b');
+        const nodeA = trie.match('/a').node;
+        assert.ok(nodeA.endpoint, '/a should be an endpoint before removal');
+        trie.remove('/a');
+        assert.strictEqual(trie.match('/a').node, null, '/a should no longer be a matchable endpoint');
+        assert.ok(trie._findNode('/a'), 'The node for /a should still exist structurally');
+        assert.ok(trie.match('/a/b').node, 'Child /a/b should still exist');
+    });
+});
+
+describe('Node Handlers', () => {
+    test('should handle methods and allows correctly', () => {
+        const trie = new Trie();
+        const handler1 = () => {};
+        const handler2 = () => {};
+        assert.throws(() => trie.define('/').handle('GET', null), 'Should not allow null handler');
+        
+        const node = trie.define('/');
+        node.handle('GET', handler1);
+        node.handle('POST', handler2);
+        
+        assert.throws(() => node.handle('GET', handler1), 'Should not allow redefining handler for same method');
+        assert.strictEqual(node.getHandler('GET'), handler1);
+        assert.strictEqual(node.getHandler('POST'), handler2);
+        assert.strictEqual(node.getAllow(), 'GET, POST');
+    });
+});

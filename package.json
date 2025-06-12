@@ -1,6 +1,7 @@
 {
   "name": "route-trie-esm",
   "description": "A minimal and powerful trie based url path router for Node.js.",
+  "type": "module",
   "authors": [
     "Yan Qing <admin@zensh.com>",
     "Tony Mobily <tonymobily@gmail.com>"
@@ -8,8 +9,7 @@
   "version": "3.0.2",
   "license": "MIT",
   "main": "index.js",
-  "scripts": {
-  },
+  "scripts": {},
   "repository": {
     "type": "git",
     "url": "git@github.com:mobily-enterprises/route-trie-esm.git"
@@ -27,8 +27,7 @@
     "url-trie",
     "router-trie"
   ],
-  "dependencies": {},
-  "devDependencies": {
+  "dependencies": {
   },
   "files": [
     "build",
