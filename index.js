@@ -187,6 +187,58 @@ class Trie {
     }
     return matched
   }
+
+  // Add this method inside the Trie class
+  remove (pattern) {
+    if (typeof pattern !== 'string') {
+      throw new TypeError('Pattern must be string.')
+    }
+    if (pattern.includes('//')) {
+      throw new Error('Multi-slash exists.')
+    }
+
+    const _pattern = pattern.replace(trimSlashReg, '')
+    const segments = _pattern.split('/')
+    let currentNode = this.root
+    let pathFound = true
+
+    // Traverse to find the node corresponding to the pattern
+    for (let i = 0; i < segments.length; i++) {
+      const segment = this.ignoreCase ? segments[i].toLowerCase() : segments[i]
+      if (currentNode.children[segment]) {
+        currentNode = currentNode.children[segment]
+      } else {
+        // Handle varyChildren for dynamic segments
+        let foundInVary = false
+        for (const child of currentNode.varyChildren) {
+          let _segment = segments[i]
+          if (child.suffix !== '') {
+            if (_segment === child.suffix || !_segment.endsWith(child.suffix)) {
+              continue
+            }
+            _segment = _segment.slice(0, _segment.length - child.suffix.length)
+          }
+          if (child.regex != null && !child.regex.test(_segment)) {
+            continue
+          }
+          currentNode = child
+          foundInVary = true
+          break
+        }
+        if (!foundInVary) {
+          pathFound = false
+          break
+        }
+      }
+    }
+
+    if (pathFound && currentNode.endpoint) {
+      // If the node is found and is an endpoint, proceed with removal
+      removeNode(currentNode)
+      return true
+    }
+    return false // Path not found or not an endpoint
+  }
 }
 
 function defineNode (parent, segments, ignoreCase) {
@@ -329,6 +381,38 @@ function parseNode (parent, segment, ignoreCase) {
     parent.children[_segment] = node
   }
   return node
+}
+
+// Add this helper function outside the classes (similar to defineNode, matchNode, parseNode)
+function removeNode (node) {
+  node.endpoint = false // Mark as no longer an endpoint
+
+  // If the node has no children and no handlers, it can be physically removed
+  if (Object.keys(node.children).length === 0 && node.varyChildren.length === 0 && Object.keys(node.handlers).length === 0) {
+    const parent = node.parent
+    if (parent) {
+      // Remove from parent's children
+      let removed = false
+      if (parent.children[node.segment] === node) {
+        delete parent.children[node.segment]
+        removed = true
+      } else {
+        // Check in varyChildren
+        const index = parent.varyChildren.indexOf(node)
+        if (index > -1) {
+          parent.varyChildren.splice(index, 1)
+          removed = true
+        }
+      }
+
+      // If the parent is no longer an endpoint and has no other children/handlers,
+      // and a node was actually removed from its children/varyChildren,
+      // recursively remove the parent
+      if (removed && !parent.endpoint && Object.keys(parent.children).length === 0 && parent.varyChildren.length === 0 && Object.keys(parent.handlers).length === 0) {
+        removeNode(parent)
+      }
+    }
+  }
 }
 
 export { Trie as default, Node, Matched }
