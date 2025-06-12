@@ -212,3 +212,86 @@ describe('Node Handlers', () => {
         assert.strictEqual(node.getAllow(), 'GET, POST');
     });
 });
+
+// --- New Edge Case Tests ---
+
+describe('Advanced Conflict Resolution', () => {
+    test('should allow different dynamic types at the same level', () => {
+        const trie = new Trie();
+        assert.doesNotThrow(() => {
+            trie.define('/c/:id');
+            trie.define('/c/:id(^[0-9]+$)');
+            trie.define('/c/:id+del');
+        });
+    });
+
+    test('should throw on identical dynamic routes', () => {
+        const trie = new Trie();
+        trie.define('/d/:id');
+        assert.throws(() => trie.define('/d/:name'), 'Should throw on conflicting param name');
+    });
+
+    test('should prioritize static over wildcard', () => {
+        const trie = new Trie();
+        trie.define('/e/static');
+        trie.define('/e/:all*');
+        const m = trie.match('/e/static');
+        assert.ok(m.node, 'Match should not be null');
+        assert.strictEqual(m.node.wildcard, false, 'Should match the static node');
+    });
+});
+
+describe('Advanced `remove` Edge Cases', () => {
+    test('should do nothing when removing a non-existent route', () => {
+        const trie = new Trie();
+        trie.define('/f/g');
+        assert.doesNotThrow(() => trie.remove('/f/h'), 'Removing non-existent route should not throw');
+        assert.ok(trie.match('/f/g').node, 'Existing route should remain');
+    });
+
+    test('should correctly prune parent nodes after removal', () => {
+        const trie = new Trie();
+        trie.define('/h/i/j');
+        assert.ok(trie._findNode('/h/i'), 'Parent node should exist before removal');
+        trie.remove('/h/i/j');
+        assert.strictEqual(trie._findNode('/h/i/j'), null, 'Node should be gone');
+        assert.strictEqual(trie._findNode('/h/i'), null, 'Parent node should be pruned');
+        assert.strictEqual(trie._findNode('/h'), null, 'Grandparent node should be pruned');
+    });
+
+    test('should handle removing the root path', () => {
+        const trie = new Trie();
+        trie.define('/');
+        trie.define('/about');
+        assert.ok(trie.match('/').node, 'Root should match before removal');
+        trie.remove('/');
+        assert.strictEqual(trie.match('/').node, null, 'Root should not match after removal');
+        assert.ok(trie.match('/about').node, 'Other routes should remain intact');
+    });
+});
+
+describe('Deeply Nested Routes', () => {
+    test('should handle very deep static routes', () => {
+        const trie = new Trie();
+        const deepPath = '/level1/level2/level3/level4/level5/endpoint';
+        trie.define(deepPath);
+        const m = trie.match(deepPath);
+        assert.ok(m.node, 'Should match deep static path');
+        assert.strictEqual(m.node.pattern, deepPath);
+    });
+
+    test('should handle very deep dynamic routes', () => {
+        const trie = new Trie();
+        const deepPath = '/org/:org/team/:team/user/:user/project/:proj/file/:file';
+        trie.define(deepPath);
+        const m = trie.match('/org/acme/team/dev/user/merc/project/router/file/index.js');
+        assert.ok(m.node, 'Should match deep dynamic path');
+        assert.deepStrictEqual(m.params, {
+            org: 'acme',
+            team: 'dev',
+            user: 'merc',
+            proj: 'router',
+            file: 'index.js'
+        });
+    });
+});
