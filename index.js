@@ -172,7 +172,7 @@ class Node {
 /**
  * The main Trie class for routing.
  */
-class Trie {
+export class Trie {
   static NAME = 'Trie'
   static VERSION = 'v3.0.0'
 
