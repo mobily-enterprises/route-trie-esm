@@ -65,7 +65,6 @@ describe('trie.define', () => {
         assert.throws(() => trie.define('/a/:+'), 'Should throw for empty suffix');
         const node1 = trie.define('/a/:b+:undelete');
         assert.strictEqual(node1.name, 'b');
-        // FIX: The suffix is the literal string after the '+', which includes the colon.
         assert.strictEqual(node1.suffix, ':undelete', 'Suffix should be correctly parsed');
         assert.throws(() => trie.define('/a/:x+:undelete'), 'Should throw for conflicting param name with same suffix');
     });
@@ -293,5 +292,57 @@ describe('Deeply Nested Routes', () => {
             proj: 'router',
             file: 'index.js'
         });
+    });
+});
+
+describe('Redirects with Dynamic Paths', () => {
+    test('TSR should work on dynamic paths', () => {
+        const trie = new Trie({ trailingSlashRedirect: true });
+        trie.define('/user/:name');
+        const m = trie.match('/user/merc/');
+        assert.strictEqual(m.node, null, 'Should not match directly');
+        assert.strictEqual(m.tsr, '/user/merc', 'Should suggest removing slash');
+    });
+
+    test('FPR should work on dynamic paths', () => {
+        const trie = new Trie({ fixedPathRedirect: true });
+        trie.define('/user/:id/profile');
+        const m = trie.match('/user//123//profile');
+        assert.strictEqual(m.node, null, 'Should not match directly');
+        assert.strictEqual(m.fpr, '/user/123/profile', 'Should suggest correct path');
+    });
+});
+
+describe('Invalid Definitions and Edge Cases', () => {
+    test('should throw on invalid parameter names', () => {
+        const trie = new Trie();
+        assert.throws(() => trie.define('/:123'), 'Parameter names cannot start with a number');
+        assert.throws(() => trie.define('/:a-b'), 'Parameter names cannot contain hyphens');
+    });
+
+    test('should not match empty segments in path', () => {
+        const trie = new Trie({ fixedPathRedirect: false });
+        trie.define('/a/b/c');
+        assert.strictEqual(trie.match('/a//c').node, null, 'Empty segment should not match');
+    });
+});
+
+describe('Remove and Redefine', () => {
+    test('should allow redefining a route after removal', () => {
+        const trie = new Trie();
+        trie.define('/a/:id');
+        assert.strictEqual(trie.match('/a/123').node.name, 'id');
+        
+        trie.remove('/a/:id');
+        assert.strictEqual(trie.match('/a/123').node, null);
+
+        assert.doesNotThrow(() => {
+            trie.define('/a/:newId');
+        }, 'Should not throw when redefining after remove');
+
+        const m = trie.match('/a/456');
+        assert.ok(m.node, 'New route should be matchable');
+        assert.strictEqual(m.node.name, 'newId');
+        assert.deepStrictEqual(m.params, { newId: '456' });
     });
 });
